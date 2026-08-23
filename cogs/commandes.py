@@ -313,7 +313,7 @@ class CommandesCog(commands.Cog):
             ephemeral=False,
         )
 
-    @ticketexecutif.error
+    @ticketexecutif.error # type: ignore
     async def ticketexecutif_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
             await interaction.response.send_message(
@@ -398,7 +398,7 @@ class CommandesCog(commands.Cog):
             f"Votre ticket a été récupéré par l'équipe **staff** de SkyRiviera.", ephemeral=False
         )
 
-    @ticketrestore.error
+    @ticketrestore.error # type: ignore
     async def ticketrestore_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.MissingPermissions):
             await interaction.response.send_message(
@@ -418,6 +418,7 @@ class CommandesCog(commands.Cog):
         date_fin="Date de fin de l'absence (ex: 25/07/2026)",
         motif="Motif de l'absence",
     )
+    @app_commands.checks.has_permissions(manage_messages=True)
     async def absence(
         self, interaction: discord.Interaction, date_début: str, date_fin: str, motif: str
     ):
@@ -492,7 +493,7 @@ class CommandesCog(commands.Cog):
             ephemeral=True,
         )
 
-    @absence.error
+    @absence.error # type: ignore
     async def absence_error(
         self, interaction: discord.Interaction, error: app_commands.AppCommandError
     ):

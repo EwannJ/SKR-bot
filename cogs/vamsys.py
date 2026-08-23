@@ -14,9 +14,9 @@ from utils import generate_pkce_pair, sanitise_name
 log = logging.getLogger("skr_bot.vamsys")
 
 
-def _compute_team(pilot_data: dict) -> int:
+def _compute_team(pilot_data: dict) -> str | None:
     rank = pilot_data.get("rank") or {}
-    name = rank.get("name")
+    name: str | None = rank.get("name")
     return name
 
 
@@ -39,7 +39,7 @@ class VamsysCog(commands.Cog):
         app.router.add_get("/vamsys/callback", self.handle_callback)
 
         self._runner = web.AppRunner(app)
-        await self._runner.setup()
+        await self._runner.setup() # type: ignore
         site = web.TCPSite(self._runner, "0.0.0.0", config.LOCAL_PORT)
         await site.start()
         log.info("Serveur web local démarré sur le port %s", config.LOCAL_PORT)

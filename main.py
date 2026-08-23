@@ -14,17 +14,13 @@ log = logging.getLogger("skr_bot")
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, help_command=None)
 
-# Client Supabase partagé, accessible depuis n'importe quel cog via self.bot.supabase
 bot.supabase = SupabaseClient(
-    url=config.SUPABASE_URL,
-    service_key=config.SUPABASE_SERVICE_KEY,
+    url=config.SUPABASE_URL, # type: ignore
+    service_key=config.SUPABASE_SERVICE_KEY, # type: ignore
     table=config.SUPABASE_TABLE,
 )
 log.info("Client Supabase configuré (table: %s)", config.SUPABASE_TABLE)
 
-# Cogs à charger, dans l'ordre : vamsys en premier car commandes en dépend
-# (récupération du cog via bot.get_cog("VamsysCog") pour créer les liaisons
-# en attente et enregistrer la vue persistante du bouton).
 INITIAL_EXTENSIONS = (
     "cogs.vamsys",
     "cogs.commandes",

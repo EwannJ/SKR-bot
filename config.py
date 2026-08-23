@@ -2,23 +2,11 @@ import os
 
 from dotenv import load_dotenv
 
-# Charge les variables définies dans un fichier .env à la racine du projet
-# (s'il existe). Sur Orion, si le panel injecte déjà les variables
-# d'environnement directement, cet appel est un no-op inoffensif.
 load_dotenv()
 
 # ---------------------------------------------------------------------------
-# SECRETS — variables d'environnement (jamais en clair dans le code)
+# Variables d'environnement
 # ---------------------------------------------------------------------------
-# À définir sur Orion (panel -> Startup / Variables) :
-#   DISCORD_TOKEN=...
-#   NGROK_AUTHTOKEN=...
-#   SUPABASE_URL=...
-#   SUPABASE_SERVICE_KEY=...
-#
-# Pas de VAMSYS_CLIENT_SECRET : le client OAuth "Authorization Code + PKCE"
-# est un client PUBLIC. La sécurité repose sur le code_verifier/code_challenge
-# (PKCE), pas sur un secret partagé — vAMSYS ne t'en fournit donc pas.
 TOKEN = os.environ.get("DISCORD_TOKEN")
 NGROK_AUTHTOKEN = os.environ.get("NGROK_AUTHTOKEN")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
