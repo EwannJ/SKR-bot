@@ -6,20 +6,13 @@ from discord.ext import commands
 from pyngrok import conf, ngrok
 
 import config
-from supabase_client import SupabaseClient
+from utils import SupabaseClient
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("skr_bot")
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, help_command=None)
-
-bot.supabase = SupabaseClient(
-    url=config.SUPABASE_URL, # type: ignore
-    service_key=config.SUPABASE_SERVICE_KEY, # type: ignore
-    table=config.SUPABASE_TABLE,
-)
-log.info("Client Supabase configuré (table: %s)", config.SUPABASE_TABLE)
 
 INITIAL_EXTENSIONS = (
     "cogs.vamsys",
@@ -45,6 +38,13 @@ async def on_ready():
 
 
 async def main():
+    bot.supabase = await SupabaseClient.create(
+        url=config.SUPABASE_URL, # type: ignore
+        service_key=config.SUPABASE_SERVICE_KEY, # type: ignore
+        table=config.SUPABASE_TABLE,
+    )
+    log.info("Client Supabase configuré (table: %s)", config.SUPABASE_TABLE)
+
     async with bot:
         try:
             for extension in INITIAL_EXTENSIONS:
