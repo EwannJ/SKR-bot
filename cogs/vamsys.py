@@ -294,7 +294,7 @@ class VamsysCog(commands.Cog):
                 "discord_user_id": str(member.id),
                 "skr_id": skr_id,
                 "first_name": first_name,
-                "last_name": last_name,
+                "last_name": last_name.upper(),
                 "team": _compute_team(pilot_data),
                 "linked_at": datetime.now(timezone.utc).isoformat(),
             }
