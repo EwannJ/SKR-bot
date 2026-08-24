@@ -320,7 +320,7 @@ class VamsysCog(commands.Cog):
             log.warning("Liaison partielle pour %s : %s", member, message)
             return web.Response(
                 text=f"✅ Compte lié, mais avec un avertissement : {message}\n\n"
-                "Tu peux fermer cette page. Contacte un administrateur si besoin."
+                "Screen cette page, note la date et l'heure et ouvre un ticket."
             )
         else:
             log.error("Échec de l'application du pseudo/rôle pour %s : %s", member, message)
