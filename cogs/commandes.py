@@ -232,7 +232,7 @@ class CommandesCog(commands.Cog):
     
 # /ticketexecutif
     @app_commands.command(name="ticketexecutif", description="Transformer le ticket actuel en un ticket réservé à l'équipe exécutive")
-    @app_commands.check.has_role(config.STAFF_ID)
+    @app_commands.checks.has_role(config.STAFF_ID)
     async def ticketexecutif(self, interaction: discord.Interaction):
         channel = interaction.channel
 
