@@ -327,7 +327,7 @@ class CommandesCog(commands.Cog):
 
 # /ticketrestore
     @app_commands.command(name="ticketrestore", description="Remettre un ticket exécutif dans son état d'origine")
-    @app_commands.check.has_role(int(config.STAFF_ID))
+    @app_commands.checks.has_role(int(config.STAFF_ID))
     async def ticketrestore(self, interaction: discord.Interaction):
         channel = interaction.channel
 
