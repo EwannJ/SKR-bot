@@ -152,7 +152,7 @@ class CommandesCog(commands.Cog):
         name="createrequestbutton",
         description="Crée le bouton de liaison de compte dans ce salon.",
     )
-    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def create_request_button(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         await interaction.channel.send(view=LinkAccountView(self.bot))
@@ -161,7 +161,6 @@ class CommandesCog(commands.Cog):
 
 # /ping
     @app_commands.command(name="ping", description="Voir le ping du bot")
-    @app_commands.checks.has_permissions(manage_messages=True)
     async def ping(self, interaction: discord.Interaction):
         latency = round(self.bot.latency * 1000)
         await interaction.response.send_message(
@@ -175,7 +174,6 @@ class CommandesCog(commands.Cog):
         description="Affiche les infos du compte vAMSYS lié à un membre.",
     )
     @app_commands.describe(membre="Le membre Discord à consulter")
-    @app_commands.checks.has_permissions(manage_messages=True)
     async def account(self, interaction: discord.Interaction, membre: discord.Member = None):
         await interaction.response.defer(ephemeral=False)
 
@@ -198,7 +196,7 @@ class CommandesCog(commands.Cog):
         description="Supprime l'entrée de liaison d'un membre.",
     )
     @app_commands.describe(membre="Le membre Discord dont il faut supprimer la liaison")
-    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def remove_account(self, interaction: discord.Interaction, membre: discord.Member):
         await interaction.response.defer(ephemeral=True)
 
@@ -234,7 +232,7 @@ class CommandesCog(commands.Cog):
     
 # /ticketexecutif
     @app_commands.command(name="ticketexecutif", description="Transformer le ticket actuel en un ticket réservé à l'équipe exécutive")
-    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.check.has_role(config.STAFF_ID)
     async def ticketexecutif(self, interaction: discord.Interaction):
         channel = interaction.channel
 
@@ -329,7 +327,7 @@ class CommandesCog(commands.Cog):
 
 # /ticketrestore
     @app_commands.command(name="ticketrestore", description="Remettre un ticket exécutif dans son état d'origine")
-    @app_commands.checks.has_permissions(manage_messages=True)
+    @app_commands.check.has_role(config.STAFF_ID)
     async def ticketrestore(self, interaction: discord.Interaction):
         channel = interaction.channel
 
