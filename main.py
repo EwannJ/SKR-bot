@@ -14,7 +14,7 @@ log = logging.getLogger("skr_bot")
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix=commands.when_mentioned, intents=intents, help_command=None)
 
-INITIAL_EXTENSIONS = (
+COGS = (
     "cogs.vamsys",
     "cogs.commandes",
 )
@@ -68,8 +68,8 @@ async def main():
 
     async with bot:
         try:
-            for extension in INITIAL_EXTENSIONS:
-                await bot.load_extension(extension)
+            for cogs in COGS:
+                await bot.load_extension(cogs)
 
             start_ngrok_tunnel()
             await bot.start(config.TOKEN)
