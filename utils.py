@@ -5,6 +5,8 @@ import logging
 
 from supabase import acreate_client, AsyncClient
 
+from config import SUPABASE_TABLE
+
 log = logging.getLogger("skr_bot.supabase")
 
 
@@ -38,12 +40,12 @@ class SupabaseClient:
     d'environnement), jamais exposée côté client.
     """
  
-    def __init__(self, client: AsyncClient, table: str = "skr_accounts"):
+    def __init__(self, client: AsyncClient, table: str = SUPABASE_TABLE):
         self._client = client
         self.table = table
  
     @classmethod
-    async def create(cls, url: str, service_key: str, table: str = "skr_accounts") -> "SupabaseClient":
+    async def create(cls, url: str, service_key: str, table: str = SUPABASE_TABLE) -> "SupabaseClient":
         """Fabrique asynchrone : le SDK crée le client via une coroutine,
         donc on ne peut pas tout faire dans __init__ (qui est synchrone)."""
         client = await acreate_client(url, service_key)

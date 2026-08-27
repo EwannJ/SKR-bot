@@ -70,6 +70,7 @@ async def main():
         try:
             for cogs in COGS:
                 await bot.load_extension(cogs)
+                log.info(f"Extension {cogs} chargée.")
 
             start_ngrok_tunnel()
             await bot.start(config.TOKEN)

@@ -11,7 +11,8 @@ TOKEN = os.environ.get("DISCORD_TOKEN")
 NGROK_AUTHTOKEN = os.environ.get("NGROK_AUTHTOKEN")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE", "skr_accounts")
+
+SUPABASE_TABLE: str = "skr_accounts"
 
 for _name, _value in [
     ("DISCORD_TOKEN", TOKEN),
