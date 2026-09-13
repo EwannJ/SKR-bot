@@ -81,7 +81,7 @@ class LinkAccountView(discord.ui.View):
         log.exception("Erreur dans le bouton de liaison vAMSYS : %s", error)
         message = (
             "Une erreur inattendue est survenue. Réessaie dans quelques instants, "
-            "et préviens un administrateur si ça persiste."
+            "et préviens un administrateur si l'erreur persiste."
         )
         try:
             if interaction.response.is_done():

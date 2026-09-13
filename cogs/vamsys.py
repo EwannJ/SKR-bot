@@ -1,5 +1,4 @@
 import logging
-import time
 import urllib.parse
 
 import discord
@@ -39,13 +38,7 @@ class VamsysCog(commands.Cog):
         code_verifier, code_challenge = generate_pkce_pair()
 
         state = create_state_token(
-            {
-                "code_verifier": code_verifier,
-                "discord_user_id": discord_user_id,
-                "guild_id": guild_id,
-                "created_at": time.time(),
-            },
-            config.VAMSYS_STATE_SECRET, # type: ignore
+            code_verifier, discord_user_id, guild_id, config.VAMSYS_STATE_SECRET # type: ignore
         )
         return state, code_challenge
 

@@ -41,8 +41,8 @@ séparateur de pseudo ou la durée de validité des liens.
 import base64
 import hashlib
 import hmac
-import json
 import os
+import struct
 import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
@@ -88,8 +88,16 @@ REDIRECT_URI = os.environ["VERCEL_CALLBACK_URL"]
 # ---------------------------------------------------------------------------
 # Jeton d'état signé — copie jumelle de utils.create_state_token /
 # verify_state_token côté bot. Ne garder que la vérification ici, la
-# création se fait côté bot (create_pending_login).
+# création se fait côté bot (create_pending_login). Format binaire compact
+# (et pas JSON) car `state` finit dans l'URL d'un bouton Discord, limitée à
+# 512 caractères. Voir le commentaire détaillé dans utils.py côté bot.
 # ---------------------------------------------------------------------------
+CODE_VERIFIER_LEN = 43  # doit correspondre à utils.CODE_VERIFIER_LEN côté bot
+_PAYLOAD_STRUCT = ">QQI"  # discord_user_id (8o), guild_id (8o), created_at (4o)
+_PAYLOAD_LEN = CODE_VERIFIER_LEN + struct.calcsize(_PAYLOAD_STRUCT)
+_SIGNATURE_LEN = 16  # HMAC-SHA256 tronqué à 128 bits
+
+
 def _b64url_decode(data: str) -> bytes:
     padding = "=" * (-len(data) % 4)
     return base64.urlsafe_b64decode(data + padding)
@@ -97,29 +105,34 @@ def _b64url_decode(data: str) -> bytes:
 
 def verify_state_token(token: str, secret: str, max_age_seconds: int) -> dict | None:
     try:
-        body_b64, signature_b64 = token.split(".", 1)
-    except ValueError:
-        return None
-
-    expected_signature = hmac.new(secret.encode("utf-8"), body_b64.encode("ascii"), hashlib.sha256).digest()
-    try:
-        provided_signature = _b64url_decode(signature_b64)
+        raw = _b64url_decode(token)
     except Exception:
         return None
 
-    if not hmac.compare_digest(expected_signature, provided_signature):
+    if len(raw) != _PAYLOAD_LEN + _SIGNATURE_LEN:
+        return None
+
+    payload, signature = raw[:_PAYLOAD_LEN], raw[_PAYLOAD_LEN:]
+
+    expected_signature = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).digest()[:_SIGNATURE_LEN]
+    if not hmac.compare_digest(expected_signature, signature):
         return None
 
     try:
-        payload = json.loads(_b64url_decode(body_b64))
+        code_verifier = payload[:CODE_VERIFIER_LEN].decode("ascii")
+        discord_user_id, guild_id, created_at = struct.unpack(_PAYLOAD_STRUCT, payload[CODE_VERIFIER_LEN:])
     except Exception:
         return None
 
-    created_at = payload.get("created_at")
-    if not isinstance(created_at, (int, float)) or time.time() - created_at > max_age_seconds:
+    if time.time() - created_at > max_age_seconds:
         return None
 
-    return payload
+    return {
+        "code_verifier": code_verifier,
+        "discord_user_id": discord_user_id,
+        "guild_id": guild_id,
+        "created_at": created_at,
+    }
 
 
 # ---------------------------------------------------------------------------

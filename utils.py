@@ -1,9 +1,9 @@
 import base64
 import hashlib
 import hmac
-import json
 import logging
 import secrets
+import struct
 import time
 
 from supabase import acreate_client, AsyncClient
@@ -12,10 +12,17 @@ from config import SUPABASE_TABLE
 
 log = logging.getLogger("skr_bot.supabase")
 
+# Longueur fixe du code_verifier PKCE : 32 octets aléatoires -> exactement
+# 43 caractères en base64url sans padding (minimum autorisé par la RFC 7636,
+# choisi ici sciemment pour garder le state le plus court possible — voir
+# plus bas pourquoi la taille compte).
+CODE_VERIFIER_BYTES = 32
+CODE_VERIFIER_LEN = 43
+
 
 def generate_pkce_pair() -> tuple[str, str]:
     """Retourne (code_verifier, code_challenge) pour PKCE (méthode S256)."""
-    code_verifier = secrets.token_urlsafe(64)
+    code_verifier = secrets.token_urlsafe(CODE_VERIFIER_BYTES)
     digest = hashlib.sha256(code_verifier.encode("ascii")).digest()
     code_challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
     return code_verifier, code_challenge
@@ -44,13 +51,29 @@ def sanitise_name(raw_name: str) -> str:
 # a donc plus de mémoire partagée où chercher `code_verifier`,
 # `discord_user_id` et `guild_id` à partir de `state`. Solution : on encode
 # ces informations directement DANS `state`, signées avec une clé secrète
-# partagée (HMAC-SHA256) pour empêcher qu'un utilisateur les falsifie, et
+# partagée (HMAC tronqué) pour empêcher qu'un utilisateur les falsifie, et
 # horodatées pour qu'elles expirent après un délai (voir LOGIN_TIMEOUT_SECONDS).
 #
+# `state` finit dans l'URL d'un bouton Discord ("Se connecter à vAMSYS"),
+# et Discord limite l'URL d'un bouton à 512 caractères. Un encodage JSON
+# classique dépasse largement cette limite une fois combiné au reste de
+# l'URL d'autorisation (redirect_uri, scope, code_challenge...). On utilise
+# donc un format binaire compact à taille fixe plutôt que du JSON :
+#   [code_verifier: 43 octets ASCII][discord_user_id: 8 octets][guild_id: 8
+#   octets][created_at: 4 octets][signature HMAC-SHA256 tronquée: 16 octets]
+# soit 79 octets bruts -> 106 caractères une fois encodés en base64url,
+# contre 300+ avec la version JSON. 128 bits de signature restent largement
+# suffisants pour empêcher toute falsification.
+#
 # ⚠️ Ce module a une copie jumelle côté fonction Vercel
-# (vercel/api/callback.py, section "Jeton d'état signé"). Les deux copies
-# doivent produire des jetons strictement compatibles : si tu modifies la
-# logique ici, répercute le changement là-bas.
+# (vercel/api/index.py, section "Jeton d'état signé"). Les deux copies
+# doivent produire/lire des jetons strictement compatibles : si tu modifies
+# le format ici, répercute le changement là-bas.
+
+_PAYLOAD_STRUCT = ">QQI"  # discord_user_id (8o), guild_id (8o), created_at (4o)
+_PAYLOAD_LEN = CODE_VERIFIER_LEN + struct.calcsize(_PAYLOAD_STRUCT)
+_SIGNATURE_LEN = 16  # HMAC-SHA256 tronqué à 128 bits
+
 
 def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
@@ -61,43 +84,53 @@ def _b64url_decode(data: str) -> bytes:
     return base64.urlsafe_b64decode(data + padding)
 
 
-def create_state_token(payload: dict, secret: str) -> str:
-    """Encode un payload en jeton signé utilisable comme paramètre `state` OAuth."""
-    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    body_b64 = _b64url_encode(body)
-    signature = hmac.new(secret.encode("utf-8"), body_b64.encode("ascii"), hashlib.sha256).digest()
-    return f"{body_b64}.{_b64url_encode(signature)}"
+def create_state_token(code_verifier: str, discord_user_id: int, guild_id: int, secret: str) -> str:
+    """Encode (code_verifier, discord_user_id, guild_id, horodatage) en un
+    jeton signé compact, utilisable comme paramètre `state` OAuth."""
+    verifier_bytes = code_verifier.encode("ascii")
+    if len(verifier_bytes) != CODE_VERIFIER_LEN:
+        raise ValueError(f"code_verifier doit faire {CODE_VERIFIER_LEN} caractères")
+
+    payload = verifier_bytes + struct.pack(_PAYLOAD_STRUCT, discord_user_id, guild_id, int(time.time()))
+    signature = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).digest()[:_SIGNATURE_LEN]
+    return _b64url_encode(payload + signature)
 
 
 def verify_state_token(token: str, secret: str, max_age_seconds: int) -> dict | None:
     """Vérifie la signature et l'expiration d'un jeton `state`.
 
-    Retourne le payload d'origine si le jeton est valide et non expiré,
-    sinon None (jeton corrompu, signature invalide ou expiré)."""
+    Retourne {"code_verifier", "discord_user_id", "guild_id", "created_at"}
+    si le jeton est valide et non expiré, sinon None (jeton corrompu,
+    signature invalide ou expiré)."""
     try:
-        body_b64, signature_b64 = token.split(".", 1)
-    except ValueError:
-        return None
-
-    expected_signature = hmac.new(secret.encode("utf-8"), body_b64.encode("ascii"), hashlib.sha256).digest()
-    try:
-        provided_signature = _b64url_decode(signature_b64)
+        raw = _b64url_decode(token)
     except Exception:
         return None
 
-    if not hmac.compare_digest(expected_signature, provided_signature):
+    if len(raw) != _PAYLOAD_LEN + _SIGNATURE_LEN:
+        return None
+
+    payload, signature = raw[:_PAYLOAD_LEN], raw[_PAYLOAD_LEN:]
+
+    expected_signature = hmac.new(secret.encode("utf-8"), payload, hashlib.sha256).digest()[:_SIGNATURE_LEN]
+    if not hmac.compare_digest(expected_signature, signature):
         return None
 
     try:
-        payload = json.loads(_b64url_decode(body_b64))
+        code_verifier = payload[:CODE_VERIFIER_LEN].decode("ascii")
+        discord_user_id, guild_id, created_at = struct.unpack(_PAYLOAD_STRUCT, payload[CODE_VERIFIER_LEN:])
     except Exception:
         return None
 
-    created_at = payload.get("created_at")
-    if not isinstance(created_at, (int, float)) or time.time() - created_at > max_age_seconds:
+    if time.time() - created_at > max_age_seconds:
         return None
 
-    return payload
+    return {
+        "code_verifier": code_verifier,
+        "discord_user_id": discord_user_id,
+        "guild_id": guild_id,
+        "created_at": created_at,
+    }
 
 
 # --- SUPABASE ---
