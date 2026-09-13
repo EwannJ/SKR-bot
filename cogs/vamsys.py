@@ -40,6 +40,10 @@ class VamsysCog(commands.Cog):
         state = create_state_token(
             code_verifier, discord_user_id, guild_id, config.VAMSYS_STATE_SECRET # type: ignore
         )
+        log.info(
+            "Lien de connexion vAMSYS généré (discord_user_id=%s, guild_id=%s)",
+            discord_user_id, guild_id,
+        )
         return state, code_challenge
 
     def build_authorize_url(self, state: str, code_challenge: str) -> str:
@@ -55,7 +59,9 @@ class VamsysCog(commands.Cog):
         query_string = "&".join(
             f"{k}={urllib.parse.quote(v, safe='')}" for k, v in params.items()
         )
-        return f"{config.VAMSYS_AUTHORIZE_URL}?{query_string}"
+        url = f"{config.VAMSYS_AUTHORIZE_URL}?{query_string}"
+        log.debug("URL d'autorisation vAMSYS générée (%d caractères) : %s", len(url), url)
+        return url
 
     # ------------------------------------------------------------------
     # Application du pseudo/rôle côté Discord
@@ -121,8 +127,10 @@ class VamsysCog(commands.Cog):
             errors.append("rôles non modifiés (rôle du bot trop bas)")
 
         if not errors:
+            log.info("Pseudo/rôle appliqués pour %s (pilot_id=%s)", member, pilot_id)
             return True, "OK"
 
+        log.warning("Liaison partielle pour %s : %s", member, " ; ".join(errors))
         return True, "Partiel : " + " ; ".join(errors)
 
     async def remove_pilot_from_member(
@@ -152,7 +160,9 @@ class VamsysCog(commands.Cog):
             errors.append("rôle non retiré (rôle du bot trop bas)")
 
         if not errors:
+            log.info("Compte vAMSYS dissocié pour %s", member)
             return True, "OK"
+        log.warning("Dissociation partielle pour %s : %s", member, " ; ".join(errors))
         return True, "Partiel : " + " ; ".join(errors)
 
 

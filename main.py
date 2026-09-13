@@ -65,6 +65,7 @@ async def main():
                 await bot.load_extension(cogs)
                 log.info(f"Extension {cogs} chargée.")
 
+            log.info("Callback vAMSYS attendu sur : %s", config.REDIRECT_URI)
             await bot.start(config.TOKEN)
         finally:
             anti_afk_supabase.cancel() # type: ignore
