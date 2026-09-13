@@ -8,17 +8,29 @@ load_dotenv()
 # Variables d'environnement
 # ---------------------------------------------------------------------------
 TOKEN = os.environ.get("DISCORD_TOKEN")
-NGROK_AUTHTOKEN = os.environ.get("NGROK_AUTHTOKEN")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+
+# URL publique de la fonction Vercel qui traite le callback OAuth vAMSYS
+# (ex: https://skr-vamsys-callback.vercel.app/api/callback). Remplace
+# l'ancien domaine ngrok.
+VERCEL_CALLBACK_URL = os.environ.get("VERCEL_CALLBACK_URL")
+
+# Clé secrète utilisée pour signer (HMAC) le paramètre `state` envoyé à
+# vAMSYS. DOIT être exactement la même valeur que celle configurée dans les
+# variables d'environnement du projet Vercel (VAMSYS_STATE_SECRET), sinon
+# la fonction Vercel rejettera tous les callbacks comme invalides.
+# Génère-en une avec : python -c "import secrets; print(secrets.token_urlsafe(48))"
+VAMSYS_STATE_SECRET = os.environ.get("VAMSYS_STATE_SECRET")
 
 SUPABASE_TABLE: str = "skr_accounts"
 
 for _name, _value in [
     ("DISCORD_TOKEN", TOKEN),
-    ("NGROK_AUTHTOKEN", NGROK_AUTHTOKEN),
     ("SUPABASE_URL", SUPABASE_URL),
     ("SUPABASE_SERVICE_KEY", SUPABASE_SERVICE_KEY),
+    ("VERCEL_CALLBACK_URL", VERCEL_CALLBACK_URL),
+    ("VAMSYS_STATE_SECRET", VAMSYS_STATE_SECRET),
 ]:
     if not _value:
         raise RuntimeError(f"Variable d'environnement manquante : {_name}")
@@ -31,14 +43,10 @@ for _name, _value in [
 # est un client Client Credentials différent)
 VAMSYS_CLIENT_ID = "973"
 
-# Domaine statique ngrok (gratuit, fixe tant que tu ne le supprimes pas)
-NGROK_DOMAIN = "barbecue-avert-reckless.ngrok-free.dev"
-
-# Port local sur lequel le mini-serveur web tourne (ngrok fait le pont vers
-# l'extérieur, donc ce port n'a pas besoin d'être ouvert publiquement sur Orion)
-LOCAL_PORT = 8080
-
-REDIRECT_URI = f"https://{NGROK_DOMAIN}/vamsys/callback"
+# URL de redirection enregistrée côté vAMSYS : doit correspondre exactement
+# à VERCEL_CALLBACK_URL et à l'URL configurée dans les paramètres OAuth de
+# l'app vAMSYS.
+REDIRECT_URI = VERCEL_CALLBACK_URL
 
 VAMSYS_AUTHORIZE_URL = "https://vamsys.io/oauth/authorize"
 VAMSYS_TOKEN_URL = "https://vamsys.io/oauth/token"
@@ -49,6 +57,10 @@ VAMSYS_USER_URL = "https://vamsys.io/api/v3/pilot/user"
 VAMSYS_SCOPES = "identity:basic identity:discord pilot:read"
 
 # Configuration par serveur Discord : pseudo + rôles à appliquer
+#
+# ⚠️ Cette table a une copie jumelle dans vercel/api/callback.py (SERVERS),
+# car la fonction Vercel applique elle-même le pseudo/rôle via l'API REST
+# Discord et n'a pas accès à ce fichier. Garde les deux copies synchronisées.
 SERVERS = {
     "1416847953783558327": {
         "nickSeparator": " | ",
@@ -60,7 +72,11 @@ SERVERS = {
     },
 }
 
-# Durée de vie max d'une tentative de liaison en attente (secondes)
+# Durée de vie max d'une tentative de liaison en attente (secondes).
+#
+# ⚠️ Cette valeur a une copie jumelle dans vercel/api/callback.py
+# (LOGIN_TIMEOUT_SECONDS), utilisée pour vérifier l'expiration du `state`
+# signé. Garde les deux copies synchronisées.
 LOGIN_TIMEOUT_SECONDS = 600  # 10 minutes
 
 # ---------------------------------------------------------------------------
@@ -82,9 +98,9 @@ TICKET_EXEC_DENY_ROLE_IDS: list[str] = [
 # Rôles à qui on donne l'accès exclusif au salon en mode exécutif.
 TICKET_EXEC_ALLOW_ROLE_IDS: list[str] = [
     "1525929854208577556", # Directeur des opérations
-    "1525905898923626527" # Responsable développement
-    "1416864103602978947" # COO
-    "1416863443478122646" # CEE
+    "1525905898923626527", # Responsable développement
+    "1416864103602978947", # COO
+    "1416863443478122646", # CEE
 ]
 
 # ---------------------------------------------------------------------------

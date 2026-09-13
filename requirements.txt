@@ -1,5 +1,3 @@
 discord.py
-pyngrok
 python-dotenv
 supabase
-aiohttp

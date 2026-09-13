@@ -1,7 +1,10 @@
 import base64
 import hashlib
-import secrets
+import hmac
+import json
 import logging
+import secrets
+import time
 
 from supabase import acreate_client, AsyncClient
 
@@ -28,6 +31,73 @@ def sanitise_name(raw_name: str) -> str:
         return part[:1].upper() + part[1:].lower()
 
     return " ".join(format_part(part) for part in raw_name.split(" ") if part)
+
+
+# --- JETON D'ÉTAT SIGNÉ (remplace pending_logins) ---
+#
+# Avant : le callback OAuth était traité par le bot lui-même (serveur aiohttp
+# local + tunnel ngrok), donc `state` pouvait être un simple identifiant
+# aléatoire pointant vers un dict en mémoire (`pending_logins`).
+#
+# Maintenant : le callback est traité par une fonction Vercel, qui tourne
+# dans un process complètement séparé et sans état entre deux appels. Il n'y
+# a donc plus de mémoire partagée où chercher `code_verifier`,
+# `discord_user_id` et `guild_id` à partir de `state`. Solution : on encode
+# ces informations directement DANS `state`, signées avec une clé secrète
+# partagée (HMAC-SHA256) pour empêcher qu'un utilisateur les falsifie, et
+# horodatées pour qu'elles expirent après un délai (voir LOGIN_TIMEOUT_SECONDS).
+#
+# ⚠️ Ce module a une copie jumelle côté fonction Vercel
+# (vercel/api/callback.py, section "Jeton d'état signé"). Les deux copies
+# doivent produire des jetons strictement compatibles : si tu modifies la
+# logique ici, répercute le changement là-bas.
+
+def _b64url_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
+
+
+def _b64url_decode(data: str) -> bytes:
+    padding = "=" * (-len(data) % 4)
+    return base64.urlsafe_b64decode(data + padding)
+
+
+def create_state_token(payload: dict, secret: str) -> str:
+    """Encode un payload en jeton signé utilisable comme paramètre `state` OAuth."""
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    body_b64 = _b64url_encode(body)
+    signature = hmac.new(secret.encode("utf-8"), body_b64.encode("ascii"), hashlib.sha256).digest()
+    return f"{body_b64}.{_b64url_encode(signature)}"
+
+
+def verify_state_token(token: str, secret: str, max_age_seconds: int) -> dict | None:
+    """Vérifie la signature et l'expiration d'un jeton `state`.
+
+    Retourne le payload d'origine si le jeton est valide et non expiré,
+    sinon None (jeton corrompu, signature invalide ou expiré)."""
+    try:
+        body_b64, signature_b64 = token.split(".", 1)
+    except ValueError:
+        return None
+
+    expected_signature = hmac.new(secret.encode("utf-8"), body_b64.encode("ascii"), hashlib.sha256).digest()
+    try:
+        provided_signature = _b64url_decode(signature_b64)
+    except Exception:
+        return None
+
+    if not hmac.compare_digest(expected_signature, provided_signature):
+        return None
+
+    try:
+        payload = json.loads(_b64url_decode(body_b64))
+    except Exception:
+        return None
+
+    created_at = payload.get("created_at")
+    if not isinstance(created_at, (int, float)) or time.time() - created_at > max_age_seconds:
+        return None
+
+    return payload
 
 
 # --- SUPABASE ---

@@ -3,7 +3,6 @@ import logging
 
 import discord
 from discord.ext import commands, tasks
-from pyngrok import conf, ngrok
 
 import config
 from utils import SupabaseClient
@@ -18,12 +17,6 @@ COGS = (
     "cogs.vamsys",
     "cogs.commandes",
 )
-
-
-def start_ngrok_tunnel():
-    conf.get_default().auth_token = config.NGROK_AUTHTOKEN
-    tunnel = ngrok.connect(addr=config.LOCAL_PORT, domain=config.NGROK_DOMAIN)
-    log.info("Tunnel ngrok ouvert : %s", tunnel.public_url)
 
 
 @tasks.loop(hours=24)
@@ -72,7 +65,6 @@ async def main():
                 await bot.load_extension(cogs)
                 log.info(f"Extension {cogs} chargée.")
 
-            start_ngrok_tunnel()
             await bot.start(config.TOKEN)
         finally:
             anti_afk_supabase.cancel() # type: ignore
