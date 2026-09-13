@@ -47,6 +47,7 @@ import time
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+import logging
 
 import requests
 
@@ -61,6 +62,8 @@ VAMSYS_USER_URL = "https://vamsys.io/api/v3/pilot/user"
 SUPABASE_TABLE = "skr_accounts"
 
 LOGIN_TIMEOUT_SECONDS = 600  # doit correspondre à config.LOGIN_TIMEOUT_SECONDS
+
+log = logging.getLogger("skr_bot.index")
 
 SERVERS = {
     "1416847953783558327": {
